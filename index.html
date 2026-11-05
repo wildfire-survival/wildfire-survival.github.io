@@ -703,6 +703,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
   --border-2: #bac5c9;
   --fire-before: #111111; /* fires in the input window, as in the paper */
   --fire-after: #1f5fbf;  /* fires after the forecast date, as in the paper */
+  --cloud: #5f7fa3;       /* cloud-covered after the date: fire unknown (drawn translucent, slate blue, unlike the gray outside land) */
   --focus: #01667b;
   --nav-hover: #80b9ff;   /* the lab's active navigation link */
   --focus-on-brand: #ffffff;
@@ -723,7 +724,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
     --rule: #22383f; --brand: #01414e; --brand-2: #4aa9bd; --brand-ink: #ffffff; --brand-ink-2: #a9cbd3;
     --sel-bg: #4aa9bd; --sel-ink: #06171c;
     --title: #d9eaf6; --sea: #09161b; --land: #1b2a2f; --coast: #3a5058; --border: #6e838a; --border-2: #41575e;
-    --fire-before: #f5f5f5; --fire-after: #6aa8ff; --focus: #6cc3d5;
+    --fire-before: #f5f5f5; --fire-after: #6aa8ff; --cloud: #8fa9c8; --focus: #6cc3d5;
     --warn-bg: #39300f; --warn-ink: #f1da8c; --err-bg: #3d1a16; --err-ink: #f4b8ae;
     --backdrop: rgb(0 0 0 / 0.6); --shadow: rgb(0 0 0 / 0.5);
     color-scheme: dark;
@@ -734,7 +735,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
   --rule: #22383f; --brand: #01414e; --brand-2: #4aa9bd; --brand-ink: #ffffff; --brand-ink-2: #a9cbd3;
   --sel-bg: #4aa9bd; --sel-ink: #06171c;
   --title: #d9eaf6; --sea: #09161b; --land: #1b2a2f; --coast: #3a5058; --border: #6e838a; --border-2: #41575e;
-  --fire-before: #f5f5f5; --fire-after: #6aa8ff; --focus: #6cc3d5;
+  --fire-before: #f5f5f5; --fire-after: #6aa8ff; --cloud: #8fa9c8; --focus: #6cc3d5;
   --warn-bg: #39300f; --warn-ink: #f1da8c; --err-bg: #3d1a16; --err-ink: #f4b8ae;
   --backdrop: rgb(0 0 0 / 0.6); --shadow: rgb(0 0 0 / 0.5);
   color-scheme: dark;
@@ -835,6 +836,13 @@ h2 { margin: 0 0 8px; color: var(--ink); font: 700 14px/1.3 var(--font-body); }
   font: 700 10.5px/17px var(--font-body); text-transform: uppercase; letter-spacing: 0.06em;
 }
 
+.regions { display: flex; gap: 2px; margin-left: auto; margin-right: 16px; padding: 3px; border: 1px solid var(--brand-ink-2); border-radius: 6px; }
+.region-btn {
+  padding: 5px 12px; border: 0; border-radius: 4px; background: none; color: var(--brand-ink);
+  font: 600 13px/1.2 var(--font-body); cursor: pointer;
+}
+.region-btn:hover { color: var(--nav-hover); }
+.region-btn[aria-pressed="true"] { background: var(--brand-ink); color: var(--brand); }
 .dates { display: flex; flex-direction: column; gap: 6px; }
 .date-row { display: grid; grid-template-columns: 48px minmax(0, 1fr); align-items: start; gap: 8px; }
 .date-year { padding-top: 6px; color: var(--ink-3); font: 600 12px/1.2 var(--font-body); font-variant-numeric: tabular-nums; }
@@ -871,6 +879,7 @@ input[type="range"] { width: 100%; margin: 0; accent-color: var(--brand-2); curs
 .sw { flex: none; width: 11px; height: 11px; margin-top: 3px; border-radius: 1px; }
 .sw-before { background: var(--fire-before); }
 .sw-after { background: var(--fire-after); }
+.sw-cloud { background: var(--cloud); opacity: 0.65; }
 
 .block-loc { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; }
 .loc { margin: 0; font: 600 14px/1.3 var(--font-body); font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -924,12 +933,13 @@ input[type="range"] { width: 100%; margin: 0; accent-color: var(--brand-2); curs
 </style>
 </head>
 <body>
-<div class="app" data-manifest="data/manifest.json">
+<div class="app" data-manifest="data/manifest.json" data-regions="[{&quot;id&quot;: &quot;canada&quot;, &quot;label&quot;: &quot;Canada&quot;, &quot;manifest&quot;: &quot;data/manifest.json&quot;}, {&quot;id&quot;: &quot;europe&quot;, &quot;label&quot;: &quot;Europe (experimental)&quot;, &quot;manifest&quot;: &quot;data/europe/manifest.json&quot;}]">
   <header class="topbar">
     <div class="brand">
       <h1 class="brand-title">Wildfire Survival Explorer</h1>
       <p class="brand-sub">Research demo</p>
     </div>
+    <div class="regions" id="regions" role="group" aria-label="Region" hidden></div>
     <nav class="topnav" aria-label="Page">
       <button type="button" class="nav-item" id="about-open" aria-haspopup="dialog">About</button>
       <span class="nav-item nav-soon" title="The paper's arXiv link goes here once it is public">arXiv<span class="soon">soon</span></span>
@@ -950,6 +960,7 @@ input[type="range"] { width: 100%; margin: 0; accent-color: var(--brand-2); curs
       <div class="ramp-ticks" id="ramp-ticks" aria-hidden="true"></div>
       <label class="toggle" for="show-before"><input type="checkbox" id="show-before" checked><span class="sw sw-before" aria-hidden="true"></span><span>Fires in the 30 days before the forecast date, seen by the model</span></label>
       <label class="toggle" for="show-after"><input type="checkbox" id="show-after" checked><span class="sw sw-after" aria-hidden="true"></span><span>Fires after the forecast date, within the lead time</span></label>
+      <label class="toggle" for="show-cloud" id="cloud-toggle" hidden><input type="checkbox" id="show-cloud" checked><span class="sw sw-cloud" aria-hidden="true"></span><span>No fire seen, but cloud-covered on most of those days: a fire could not have been seen</span></label>
       <p class="legend-foot"><span id="model-text"></span> Gray land lies outside the forecast area.</p>
     </div>
   </main>
@@ -1076,7 +1087,23 @@ input[type="range"] { width: 100%; margin: 0; accent-color: var(--brand-2); curs
     window.__wfReady = true;
   }
 
-  const manifestUrl = new URL(document.querySelector('.app').dataset.manifest, document.baseURI);
+  // regions (build.py lists them): the one named in the address (#europe) or the first; switching reloads the page
+  const appEl = document.querySelector('.app');
+  const regions = JSON.parse(appEl.dataset.regions || '[]');
+  const region = regions.find((r) => r.id === location.hash.slice(1)) || regions[0];
+  const manifestUrl = new URL(region ? region.manifest : appEl.dataset.manifest, document.baseURI);
+  if (regions.length > 1) {
+    const box = $('regions');
+    for (const r of regions) {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'region-btn'; b.textContent = r.label;
+      b.setAttribute('aria-pressed', String(r === region));
+      b.addEventListener('click', () => { if (r !== region) { location.hash = r.id; } });
+      box.append(b);
+    }
+    box.hidden = false;
+    window.addEventListener('hashchange', () => location.reload());
+  }
   fetch(manifestUrl, { cache: 'no-cache' })
     .then((r) => {
       if (!r.ok) throw new Error(`the forecast index was not found (HTTP ${r.status})`);
@@ -1167,7 +1194,7 @@ input[type="range"] { width: 100%; margin: 0; accent-color: var(--brand-2); curs
     function readTheme() {
       colors.theme = effectiveTheme();
       const cs = getComputedStyle(document.documentElement);
-      for (const k of ['sea', 'land', 'coast', 'border', 'border-2', 'fire-before', 'fire-after', 'ink']) {
+      for (const k of ['sea', 'land', 'coast', 'border', 'border-2', 'fire-before', 'fire-after', 'cloud', 'ink']) {
         colors.css[k] = cs.getPropertyValue('--' + k).trim();
       }
       const stops = RAMPS[colors.theme].map(hexToRgb);
@@ -1176,6 +1203,8 @@ input[type="range"] { width: 100%; margin: 0; accent-color: var(--brand-2); curs
       for (let q = 1; q < 256; q++) colors.lut[q] = pack(rampColor(stops, tOfF(qToF(q))));
       colors.before = pack(hexToRgb(colors.css['fire-before']));
       colors.after = pack(hexToRgb(colors.css['fire-after']));
+      const cl = hexToRgb(colors.css.cloud);
+      colors.cloud = ((165 << 24) | (cl[2] << 16) | (cl[1] << 8) | cl[0]) >>> 0;   // translucent
     }
 
     // ---- layers -------------------------------------------------------------------------------------
@@ -1280,12 +1309,43 @@ input[type="range"] { width: 100%; margin: 0; accent-color: var(--brand-2); curs
           }
           e.winPyr = pyramid(win, false);
           e.firstPyr = pyramid(first, true);
-          e.obs = obs;
-        }, (err) => { e.obsP = null; throw err; });
+          e.first = first;
+          e.hid = {};
+          return Promise.all((e.fc.unobserved || []).map(decodeLayer)).then((layers) => {
+            if (layers.length) {
+              const bits = new Uint32Array(obs.length);
+              layers.forEach((l, b) => { for (let i = 0; i < l.length; i++) bits[i] |= l[i] << (8 * b); });
+              e.cloudBits = bits;
+            }
+            e.obs = obs;
+          });
+        }).catch((err) => { e.obsP = null; throw err; });
       }
       return e.obsP;
     }
     const pyrOf = (e, t) => e.pyr[t] || (e.pyr[t] = pyramid(e.raw[t], false));   // built when t is first drawn
+    function popcount(x) {
+      x -= (x >>> 1) & 0x55555555;
+      x = (x & 0x33333333) + ((x >>> 2) & 0x33333333);
+      return (((x + (x >>> 4)) & 0x0f0f0f0f) * 0x01010101) >>> 24;
+    }
+    const cloudMask = (days) => (days >= 32 ? 0xffffffff : ((1 << days) >>> 0) - 1) >>> 0;
+    function cloudDays(e, idx, days) {   // days among the first `days` after the date when Terra could not see the ground
+      return e.cloudBits ? popcount((e.cloudBits[idx] & cloudMask(days)) >>> 0) : 0;
+    }
+    function hiddenPyr(e, t) {   // no fire seen within t days, but cloud-covered on most of the days with information
+      const days = Math.min(t, e.fc.unobserved_days || 0);
+      if (!e.cloudBits || days === 0) return null;
+      if (!e.hid[t]) {
+        const h = new Uint8Array(e.cloudBits.length), mask = cloudMask(days);
+        for (let i = 0; i < h.length; i++) {
+          if (e.first[i] <= t) continue;
+          if (2 * popcount((e.cloudBits[i] & mask) >>> 0) > days) h[i] = 1;
+        }
+        e.hid[t] = pyramid(h, false);
+      }
+      return e.hid[t];
+    }
     function loadRest(e) {   // every other lead time, nearest to the chosen one first, four at a time
       if (!e.rest) {
         const order = e.fc.taus.filter((t) => !e.raw[t])
@@ -1311,6 +1371,7 @@ input[type="range"] { width: 100%; margin: 0; accent-color: var(--brand-2); curs
       shownTau: null,     // the lead time on the map; trails `tau` while its layer loads
       before: true,
       after: true,
+      cloud: true,
       sel: null,          // {row, col}
       selRule: null,      // how the starting location was chosen; null once the reader picks one
       entry: null,        // the forecast on the map; trails `date` while its layers load
@@ -1400,9 +1461,10 @@ input[type="range"] { width: 100%; margin: 0; accent-color: var(--brand-2); curs
       const ctx = canvas.getContext('2d');
       ctx.clearRect(0, 0, 256, 256);
       const e = state.entry, tau = state.shownTau;
-      if (!e || !e.obs || !e.raw[tau] || (!state.before && !state.after)) return;
+      if (!e || !e.obs || !e.raw[tau] || (!state.before && !state.after && !state.cloud)) return;
       const level = levelFor(coords.z);
       const win = e.winPyr[level], first = e.firstPyr[level];
+      const hp = state.cloud ? hiddenPyr(e, tau) : null, hid = hp && hp[level];
       const area = pyrOf(e, tau)[level];   // fires are drawn only where a forecast exists
       const { cols, rows, w } = tileIndex(coords, level);
       const img = ctx.createImageData(256, 256), px = new Uint32Array(img.data.buffer);
@@ -1417,6 +1479,7 @@ input[type="range"] { width: 100%; margin: 0; accent-color: var(--brand-2); curs
           if (!area[k]) continue;
           if (state.after && first[k] <= tau) px[o + i] = colors.after;          // after the date, drawn on top
           else if (state.before && win[k]) px[o + i] = colors.before;
+          else if (hid && hid[k]) px[o + i] = colors.cloud;
         }
       }
       ctx.putImageData(img, 0, 0);
@@ -1462,7 +1525,14 @@ input[type="range"] { width: 100%; margin: 0; accent-color: var(--brand-2); curs
       const parts = [];
       if (burning) parts.push(long ? `Fire detected in the ${manifest.input_days} days before the forecast date.` : 'Fire in the input window');
       if (d > 0) parts.push(long ? `First fire after the forecast date: day ${d}.` : `First fire after the date: day ${d}`);
-      else parts.push(long ? `No fire detected within ${n} days after the forecast date.` : `No fire in the ${n} days after the date`);
+      else if (n === 0) parts.push(long ? 'No observations after the forecast date yet.' : 'No observations after the date yet');
+      else parts.push(long ? `No fire detected within ${plural(n, 'day')} after the forecast date.` : `No fire in the ${plural(n, 'day')} after the date`);
+      const k = Math.min(n, e.fc.unobserved_days || 0);
+      if (e.cloudBits && k > 0 && d === 0) {
+        const c = cloudDays(e, idx, k);
+        if (c) parts.push(long ? `Cloud-covered on ${c} of the ${plural(k, 'day')} after the date, when a fire could not have been seen.`
+          : `Cloud-covered on ${c} of ${plural(k, 'day')}`);
+      }
       return parts;
     }
 
@@ -1745,6 +1815,8 @@ input[type="range"] { width: 100%; margin: 0; accent-color: var(--brand-2); curs
     }).observe($('curve'));
     $('show-before').addEventListener('change', (ev) => { state.before = ev.target.checked; fireLayer.repaint(); });
     $('show-after').addEventListener('change', (ev) => { state.after = ev.target.checked; fireLayer.repaint(); });
+    $('show-cloud').addEventListener('change', (ev) => { state.cloud = ev.target.checked; fireLayer.repaint(); });
+    $('cloud-toggle').hidden = !manifest.forecasts.some((f) => f.unobserved);
     darkQuery.addEventListener('change', applyTheme);
     new MutationObserver(applyTheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 

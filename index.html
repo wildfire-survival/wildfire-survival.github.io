@@ -836,7 +836,7 @@ h2 { margin: 0 0 8px; color: var(--ink); font: 700 14px/1.3 var(--font-body); }
 }
 
 .dates { display: flex; flex-direction: column; gap: 6px; }
-.date-row { display: grid; grid-template-columns: 40px minmax(0, 1fr); align-items: start; gap: 8px; }
+.date-row { display: grid; grid-template-columns: 48px minmax(0, 1fr); align-items: start; gap: 8px; }
 .date-year { padding-top: 6px; color: var(--ink-3); font: 600 12px/1.2 var(--font-body); font-variant-numeric: tabular-nums; }
 .date-chips { display: flex; flex-wrap: wrap; gap: 5px; }
 .date-btn {
@@ -1503,8 +1503,10 @@ input[type="range"] { width: 100%; margin: 0; accent-color: var(--brand-2); curs
       box.replaceChildren();
       let chips = null, year = null;
       for (const d of datesFor(state.model)) {
-        if (d.slice(0, 4) !== year) {
-          year = d.slice(0, 4);
+        const latest = forecastFor(state.model, d).group === 'latest';
+        const label = latest ? 'Latest' : d.slice(0, 4);
+        if (label !== year) {
+          year = label;
           chips = el('div', { class: 'date-chips' });
           const row = el('div', { class: 'date-row' });
           row.append(el('span', { class: 'date-year', 'aria-hidden': 'true' }, year), chips);
@@ -1517,7 +1519,8 @@ input[type="range"] { width: 100%; margin: 0; accent-color: var(--brand-2); curs
       }
       const fc = fcNow();
       $('window-text').textContent =
-        `Model input: the ${manifest.input_days} days from ${fmtDate(addDays(fc.date, 1 - manifest.input_days), { year: undefined })} to ${fmtDate(fc.date)}.`;
+        `Model input: the ${manifest.input_days} days from ${fmtDate(addDays(fc.date, 1 - manifest.input_days), { year: undefined })} to ${fmtDate(fc.date)}.`
+        + (fc.observed_through ? ` Fires observed through ${fmtDate(fc.observed_through)} so far.` : '');
     }
     function renderLead() {
       const fc = fcNow(), tau = state.tau, slider = $('lead'), n = fc.taus.length;
